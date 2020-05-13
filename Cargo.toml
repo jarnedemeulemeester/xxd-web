@@ -1,0 +1,16 @@
+[package]
+name = "xxd-web"
+version = "0.1.0"
+authors = ["DemeulemeesterJarne <jarne.demeulemeester@student.howest.be>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+rocket = "0.4.4"
+rocket-multipart-form-data = "0.8.1"
+
+[dependencies.rocket_contrib]
+version = "0.4.4"
+default-features = false
+features = ["tera_templates","serve"]
