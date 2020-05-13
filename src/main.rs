@@ -20,7 +20,7 @@ fn xxd(content_type: &ContentType, data: Data) -> Result<Response, NotFound<Stri
 
     // Multipart Form setup
     let mut options = MultipartFormDataOptions::new();
-    options.allowed_fields.push(MultipartFormDataField::file("file"));
+    options.allowed_fields.push(MultipartFormDataField::file("file").size_limit(20971520));
     let multipart_form_data = MultipartFormData::parse(content_type, data, options).unwrap();
     let file = multipart_form_data.files.get("file");
 
