@@ -54,10 +54,12 @@ fn xxd(content_type: &ContentType, data: Data) -> Result<Response, NotFound<Stri
             }
         }
     }
+    // Remove file extention and change to .cc
+    // let filename_parts: Vec<&str> = filename.split(".").collect();
+    // let filename_without_ext = &filename_parts[0..filename_parts.len()-1].join(".");
+    // let final_filename = [filename_without_ext, ".", "cc"].concat();
 
-    let filename_parts: Vec<&str> = filename.split(".").collect();
-
-    let final_filename = [filename_parts[0], ".", "cc"].concat();
+    let final_filename = [filename, ".cc"].concat();
 
     let response = Response::build()
         .status(Status::Ok)
