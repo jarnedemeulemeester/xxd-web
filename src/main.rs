@@ -2,6 +2,7 @@
 
 #[macro_use] extern crate rocket;
 
+use std::env;
 use std::fs::File;
 use std::path::PathBuf;
 use std::process::Command;
@@ -18,9 +19,15 @@ use rocket_multipart_form_data::{MultipartFormDataOptions, MultipartFormData, Mu
 #[post("/xxd", data = "<data>")]
 fn xxd(content_type: &ContentType, data: Data) -> Result<Response, NotFound<String>> {
 
+    // Maximum filesize in bytes
+    let mut max_filesize = 20971520;
+    if !env::var("MAX_FILESIZE").is_err(){
+        max_filesize = env::var("MAX_FILESIZE").unwrap().parse::<u64>().unwrap();
+    }
+
     // Multipart Form setup
     let mut options = MultipartFormDataOptions::new();
-    options.allowed_fields.push(MultipartFormDataField::file("file").size_limit(20971520));
+    options.allowed_fields.push(MultipartFormDataField::file("file").size_limit(max_filesize));
     let multipart_form_data = MultipartFormData::parse(content_type, data, options).unwrap();
     let file = multipart_form_data.files.get("file");
 
