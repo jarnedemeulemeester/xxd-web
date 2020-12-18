@@ -9,7 +9,7 @@ use std::process::Command;
 
 use rocket::Data;
 use rocket::http::{ContentType, Status};
-use rocket::http::hyper::header::{ ContentDisposition, DispositionType, DispositionParam, Charset};
+use rocket::http::hyper::header::{ContentDisposition, DispositionType, DispositionParam, Charset};
 use rocket::response::status::NotFound;
 use rocket::response::Response;
 use rocket_contrib::serve::StaticFiles;
@@ -31,10 +31,10 @@ fn xxd(content_type: &ContentType, data: Data) -> Result<Response, NotFound<Stri
     let multipart_form_data = MultipartFormData::parse(content_type, data, options).unwrap();
     let file = multipart_form_data.files.get("file");
 
-    // let mut path = PathBuf::new();
     let mut new_path = PathBuf::new();
     let mut filename: &str = "";
 
+    // Do some magic with the file
     if let Some(file) = file {
         println!("File received");
         match file {
@@ -61,13 +61,10 @@ fn xxd(content_type: &ContentType, data: Data) -> Result<Response, NotFound<Stri
             }
         }
     }
-    // Remove file extention and change to .cc
-    // let filename_parts: Vec<&str> = filename.split(".").collect();
-    // let filename_without_ext = &filename_parts[0..filename_parts.len()-1].join(".");
-    // let final_filename = [filename_without_ext, ".", "cc"].concat();
 
     let final_filename = [filename, ".cc"].concat();
 
+    // Respond with file
     let response = Response::build()
         .status(Status::Ok)
         .header(ContentDisposition {
