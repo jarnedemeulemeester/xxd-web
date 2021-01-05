@@ -1,11 +1,15 @@
 extern crate actix_web;
 extern crate uuid;
+extern crate log;
+extern crate env_logger;
 
 //use std::env;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
+
+use log::{info};
 
 use actix_files as fs;
 use actix_multipart::Multipart;
@@ -63,7 +67,7 @@ async fn xxd(mut payload: Multipart) -> Result<NamedFile> {
         )
         .status()
         .expect("Failed");
-    println!("Conversion exited with: {}", status);
+    info!("Conversion exited with: {}", status);
 
     std::fs::remove_file(["./tmp/", session_id.to_string().as_str(), "/", filename].concat()).unwrap();
 
@@ -84,6 +88,9 @@ async fn xxd(mut payload: Multipart) -> Result<NamedFile> {
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     std::fs::create_dir_all("./tmp").unwrap();
+
+    std::env::set_var("RUST_LOG", "info");
+    env_logger::init();
 
     HttpServer::new(|| {
         App::new()
