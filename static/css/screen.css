@@ -21,12 +21,13 @@ p {
   margin: 0;
 }
 
-.container {
+/* .container {
   text-align: center;
-}
+} */
 
 .title {
   margin-bottom: 6px;
+  text-align: center;
 }
 
 .small-text {

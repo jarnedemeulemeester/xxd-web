@@ -5,6 +5,8 @@ services:
     build: .
     image: jdserver/xxd-web
     container_name: xxd-web
+    ports:
+      - 8000:8000
     networks:
       - proxy
     labels:
