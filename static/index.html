@@ -4,18 +4,24 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>xxd converter</title>
-  <link rel="stylesheet" href="/css/normalize.css">
-  <link rel="stylesheet" href="/css/screen.css">
+  <link rel="stylesheet" href="css/normalize.css">
+  <link rel="stylesheet" href="css/screen.css">
+  <link rel="stylesheet" href="css/upload.css">
 </head>
 <body>
   <div class="container">
     <h1 class="title">XXD CONVERTER</h1>
-    <p class="small-text">Because Ruban can't use Linux 👀️</p>
+    <p class="small-text">Upload your .tflite model and we will convert it for you!</p>
     <form class="form" action="/xxd" enctype="multipart/form-data" method="post">
-      <input class="form-input" type="file" name="file" id="file" required>
-      <input class="form-submit-btn" type="submit" value="Convert">
+      <div class="upload-btn-wrapper">
+        <label class="btn" for="file">↑ Upload a file</label>
+        <input class="form-input custom-file-input" type="file" name="file" id="file" required />
+      </div>
+      <input class="btn" type="submit" value="Convert →">
     </form>
+    <p class="file-name"></p>
     <p class="max-file-size">Max file size: 20MB</p>
   </div>
+  <script src='js/upload.js'></script>
 </body>
 </html>
