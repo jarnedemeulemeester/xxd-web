@@ -24,7 +24,7 @@ use header::ContentDisposition;
 use uuid::Uuid;
 
 async fn index(_req: HttpRequest) -> Result<NamedFile> {
-    let path: PathBuf = "./static/index.html".parse().unwrap();
+    let path: PathBuf = "./static/index.html".parse()?;
     Ok(NamedFile::open(path)?)
 }
 
@@ -44,10 +44,11 @@ async fn xxd(mut payload: Multipart) -> Result<NamedFile> {
     let filepath = format!("./tmp/{}/{}", session_id, sanitize_filename::sanitize(filename));
 
 
+
     let mut f = web::block(|| File::create(filepath)).await.unwrap();
 
     while let Some(chunk) = field.next().await {
-        let data = chunk.unwrap();
+        let data = chunk?;
         f = web::block(move || f.write_all(&data).map(|_| f)).await?;
     }
 
@@ -69,13 +70,12 @@ async fn xxd(mut payload: Multipart) -> Result<NamedFile> {
         .expect("Failed");
     info!("Conversion exited with: {}", status);
 
-    std::fs::remove_file(["./tmp/", session_id.to_string().as_str(), "/", filename].concat()).unwrap();
+    std::fs::remove_file(["./tmp/", session_id.to_string().as_str(), "/", filename].concat())?;
 
     let final_filename = [filename, ".cc"].concat();
     let path: PathBuf = ["./tmp/", session_id.to_string().as_str(), "/", final_filename.as_str()]
         .concat()
-        .parse()
-        .unwrap();
+        .parse()?;
 
     let cd = ContentDisposition {
         disposition: DispositionType::Attachment,
@@ -87,7 +87,7 @@ async fn xxd(mut payload: Multipart) -> Result<NamedFile> {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    std::fs::create_dir_all("./tmp").unwrap();
+    std::fs::create_dir_all("./tmp")?;
 
     std::env::set_var("RUST_LOG", "info");
     env_logger::init();
