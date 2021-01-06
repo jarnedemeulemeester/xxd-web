@@ -36,16 +36,16 @@ async fn xxd(mut payload: Multipart) -> Result<NamedFile> {
     // }
 
     let session_id = Uuid::new_v4();
-    std::fs::create_dir(format!("./tmp/{}", session_id))?;
+    let session_dir = format!("./tmp/{}", session_id);
+    std::fs::create_dir(session_dir.clone())?;
 
     let mut field = payload.try_next().await.unwrap().unwrap();
     let content_type = field.content_disposition().unwrap();
     let filename = content_type.get_filename().unwrap();
-    let filepath = format!("./tmp/{}/{}", session_id, sanitize_filename::sanitize(filename));
+    let filepath = format!("{}/{}", session_dir, sanitize_filename::sanitize(filename));
+    let final_filepath = format!("{}.cc", filepath.clone());
 
-
-
-    let mut f = web::block(|| File::create(filepath)).await.unwrap();
+    let mut f = File::create(filepath.clone())?;
 
     while let Some(chunk) = field.next().await {
         let data = chunk?;
@@ -55,34 +55,22 @@ async fn xxd(mut payload: Multipart) -> Result<NamedFile> {
     // Dump to hex and put in c array with xxd
     let status = Command::new("xxd")
         .arg("-i")
-        .arg(["./tmp/", session_id.to_string().as_str(), "/", sanitize_filename::sanitize(filename).as_str()].concat())
-        .arg(
-            [
-                "./tmp/",
-                session_id.to_string().as_str(),
-                "/",
-                sanitize_filename::sanitize(filename).as_str(),
-                ".cc",
-            ]
-            .concat(),
-        )
+        .arg(filepath.clone())
+        .arg(final_filepath.clone())
         .status()
         .expect("Failed");
     info!("Conversion exited with: {}", status);
 
-    std::fs::remove_file(["./tmp/", session_id.to_string().as_str(), "/", filename].concat())?;
-
-    let final_filename = [filename, ".cc"].concat();
-    let path: PathBuf = ["./tmp/", session_id.to_string().as_str(), "/", final_filename.as_str()]
-        .concat()
-        .parse()?;
+    std::fs::remove_file(filepath)?;
+    
+    let final_filename = format!("{}.cc", filename);
 
     let cd = ContentDisposition {
         disposition: DispositionType::Attachment,
         parameters: vec![DispositionParam::Filename(String::from(final_filename))],
     };
 
-    Ok(NamedFile::open(path)?.set_content_disposition(cd))
+    Ok(NamedFile::open(final_filepath)?.set_content_disposition(cd))
 }
 
 #[actix_web::main]
