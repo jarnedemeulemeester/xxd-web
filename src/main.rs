@@ -1,7 +1,7 @@
 extern crate actix_web;
-extern crate uuid;
-extern crate log;
 extern crate env_logger;
+extern crate log;
+extern crate uuid;
 
 //use std::env;
 use std::fs::File;
@@ -9,7 +9,7 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
 
-use log::{info};
+use log::info;
 
 use actix_files as fs;
 use actix_multipart::Multipart;
@@ -43,6 +43,7 @@ async fn xxd(mut payload: Multipart) -> Result<NamedFile> {
     let content_type = field.content_disposition().unwrap();
     let filename = content_type.get_filename().unwrap();
     let filepath = format!("{}/{}", session_dir, sanitize_filename::sanitize(filename));
+    let final_filename = format!("{}.cc", filename.clone());
     let final_filepath = format!("{}.cc", filepath.clone());
 
     let mut f = File::create(filepath.clone())?;
@@ -54,16 +55,15 @@ async fn xxd(mut payload: Multipart) -> Result<NamedFile> {
 
     // Dump to hex and put in c array with xxd
     let status = Command::new("xxd")
+        .current_dir(session_dir)
         .arg("-i")
-        .arg(filepath.clone())
-        .arg(final_filepath.clone())
+        .arg(filename)
+        .arg(final_filename.clone())
         .status()
         .expect("Failed");
     info!("Conversion exited with: {}", status);
 
     std::fs::remove_file(filepath)?;
-    
-    let final_filename = format!("{}.cc", filename);
 
     let cd = ContentDisposition {
         disposition: DispositionType::Attachment,
