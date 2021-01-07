@@ -1,89 +1,103 @@
-#![feature(proc_macro_hygiene, decl_macro)]
+extern crate actix_web;
+extern crate env_logger;
+extern crate log;
+extern crate uuid;
 
-#[macro_use] extern crate rocket;
-
-use std::env;
+//use std::env;
 use std::fs::File;
+use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
 
-use rocket::Data;
-use rocket::http::{ContentType, Status};
-use rocket::http::hyper::header::{ContentDisposition, DispositionType, DispositionParam, Charset};
-use rocket::response::status::NotFound;
-use rocket::response::Response;
-use rocket_contrib::serve::StaticFiles;
+use log::info;
 
-use rocket_multipart_form_data::{MultipartFormDataOptions, MultipartFormData, MultipartFormDataField, FileField};
+use actix_files as fs;
+use actix_multipart::Multipart;
+use actix_web::{
+    http::header::{self, DispositionParam, DispositionType},
+    middleware, web, App, HttpRequest, HttpServer, Result,
+};
+use fs::NamedFile;
+use futures::{StreamExt, TryStreamExt};
+use header::ContentDisposition;
 
-#[post("/xxd", data = "<data>")]
-fn xxd(content_type: &ContentType, data: Data) -> Result<Response, NotFound<String>> {
+use uuid::Uuid;
 
-    // Maximum filesize in bytes
-    let mut max_filesize = 20971520;
-    if !env::var("MAX_FILESIZE").is_err(){
-        max_filesize = env::var("MAX_FILESIZE").unwrap().parse::<u64>().unwrap();
-    }
-
-    // Multipart Form setup
-    let mut options = MultipartFormDataOptions::new();
-    options.allowed_fields.push(MultipartFormDataField::file("file").size_limit(max_filesize));
-    let multipart_form_data = MultipartFormData::parse(content_type, data, options).unwrap();
-    let file = multipart_form_data.files.get("file");
-
-    let mut new_path = PathBuf::new();
-    let mut filename: &str = "";
-
-    // Do some magic with the file
-    if let Some(file) = file {
-        println!("File received");
-        match file {
-            FileField::Single(file) => {
-                let _content_type = &file.content_type;
-                let _file_name = &file.file_name;
-                let _path = &file.path;
-                new_path = _path.to_path_buf();
-                new_path.set_extension("cc");
-                filename = &_file_name.as_ref().unwrap();
-                println!("{:?}", _path);
-                
-                // Covert to c array
-                let status = Command::new("xxd")
-                    .arg("-i")
-                    .arg(_path.to_path_buf())
-                    .arg(&new_path)
-                    .status()
-                    .expect("Failed");
-                println!("Conversion exited with: {}", status);
-            }
-            FileField::Multiple(_bytes) => {
-                
-            }
-        }
-    }
-
-    let final_filename = [filename, ".cc"].concat();
-
-    // Respond with file
-    let response = Response::build()
-        .status(Status::Ok)
-        .header(ContentDisposition {
-            disposition: DispositionType::Attachment,
-            parameters: vec![DispositionParam::Filename(
-              Charset::Iso_8859_1, // The character set for the bytes of the filename
-              None, // The optional language tag (see `language-tag` crate)
-              (&final_filename).as_bytes().to_vec() // the actual bytes of the filename
-            )]
-        })
-        .sized_body(File::open(new_path).map_err(|e| NotFound(e.to_string()))?)
-        .ok();
-
-    response
+async fn index(_req: HttpRequest) -> Result<NamedFile> {
+    let path: PathBuf = "./static/index.html".parse()?;
+    Ok(NamedFile::open(path)?)
 }
 
-fn main() {
-    rocket::ignite()
-        .mount("/", routes![xxd])
-        .mount("/", StaticFiles::from("./static"))
-        .launch();
+async fn xxd(mut payload: Multipart) -> Result<NamedFile> {
+    // Maximum filesize in bytes
+    // let mut max_filesize = 20971520;
+    // if !env::var("MAX_FILESIZE").is_err() {
+    //     max_filesize = env::var("MAX_FILESIZE").unwrap().parse::<u64>().unwrap();
+    // }
+
+    // Create unique session id and directory
+    let session_id = Uuid::new_v4();
+    let session_dir = format!("./tmp/{}", session_id);
+    std::fs::create_dir(session_dir.clone())?;
+
+    // Load the first file
+    let mut field = payload.try_next().await.unwrap().unwrap();
+    let content_type = field.content_disposition().unwrap();
+    let filename = content_type.get_filename().unwrap();
+    let filepath = format!("{}/{}", session_dir, sanitize_filename::sanitize(filename));
+    let final_filename = format!("{}.cc", filename.clone());
+    let final_filepath = format!("{}.cc", filepath.clone());
+
+    // Create file
+    let mut f = File::create(filepath.clone())?;
+
+    // Write bytes to file
+    while let Some(chunk) = field.next().await {
+        let data = chunk?;
+        f = web::block(move || f.write_all(&data).map(|_| f)).await?;
+    }
+
+    // Dump to hex and put in c array with xxd
+    let status = Command::new("xxd")
+        .current_dir(session_dir)
+        .arg("-i")
+        .arg(filename)
+        .arg(final_filename.clone())
+        .status()
+        .expect("Failed");
+    info!("Conversion exited with: {}", status);
+
+    // Remove pre converted file
+    std::fs::remove_file(filepath)?;
+
+    // Setup content disposition with correct filename
+    let cd = ContentDisposition {
+        disposition: DispositionType::Attachment,
+        parameters: vec![DispositionParam::Filename(String::from(final_filename))],
+    };
+
+    // Return converted file
+    Ok(NamedFile::open(final_filepath)?.set_content_disposition(cd))
+}
+
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
+    // Create temporary directory for file conversions
+    std::fs::create_dir_all("./tmp")?;
+
+    // Setup logging
+    std::env::set_var("RUST_LOG", "info");
+    env_logger::init();
+
+    // Setup http server
+    HttpServer::new(|| {
+        App::new()
+            .wrap(middleware::Logger::default())
+            .route("/", web::get().to(index))
+            .route("/xxd", web::post().to(xxd))
+            .service(fs::Files::new("/", "./static").show_files_listing())
+    })
+    .bind("127.0.0.1:8080")?
+    .run()
+    .await
 }
