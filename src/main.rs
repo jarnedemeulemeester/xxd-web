@@ -35,10 +35,12 @@ async fn xxd(mut payload: Multipart) -> Result<NamedFile> {
     //     max_filesize = env::var("MAX_FILESIZE").unwrap().parse::<u64>().unwrap();
     // }
 
+    // Create unique session id and directory
     let session_id = Uuid::new_v4();
     let session_dir = format!("./tmp/{}", session_id);
     std::fs::create_dir(session_dir.clone())?;
 
+    // Load the first file
     let mut field = payload.try_next().await.unwrap().unwrap();
     let content_type = field.content_disposition().unwrap();
     let filename = content_type.get_filename().unwrap();
@@ -46,8 +48,10 @@ async fn xxd(mut payload: Multipart) -> Result<NamedFile> {
     let final_filename = format!("{}.cc", filename.clone());
     let final_filepath = format!("{}.cc", filepath.clone());
 
+    // Create file
     let mut f = File::create(filepath.clone())?;
 
+    // Write bytes to file
     while let Some(chunk) = field.next().await {
         let data = chunk?;
         f = web::block(move || f.write_all(&data).map(|_| f)).await?;
@@ -63,23 +67,29 @@ async fn xxd(mut payload: Multipart) -> Result<NamedFile> {
         .expect("Failed");
     info!("Conversion exited with: {}", status);
 
+    // Remove pre converted file
     std::fs::remove_file(filepath)?;
 
+    // Setup content disposition with correct filename
     let cd = ContentDisposition {
         disposition: DispositionType::Attachment,
         parameters: vec![DispositionParam::Filename(String::from(final_filename))],
     };
 
+    // Return converted file
     Ok(NamedFile::open(final_filepath)?.set_content_disposition(cd))
 }
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    // Create temporary directory for file conversions
     std::fs::create_dir_all("./tmp")?;
 
+    // Setup logging
     std::env::set_var("RUST_LOG", "info");
     env_logger::init();
 
+    // Setup http server
     HttpServer::new(|| {
         App::new()
             .wrap(middleware::Logger::default())
