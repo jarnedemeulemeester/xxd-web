@@ -20,28 +20,17 @@ use uuid::Uuid;
 
 static TMP_DIR: &str = "./tmp";
 
-async fn index(_req: HttpRequest) -> Result<NamedFile> {
-    let path: PathBuf = "./static/index.html".parse()?;
-    Ok(NamedFile::open(path)?)
-}
-
-async fn xxd(mut payload: Multipart) -> Result<NamedFile> {
-    // Maximum filesize in bytes
-    // let mut max_filesize = 20971520;
-    // if !env::var("MAX_FILESIZE").is_err() {
-    //     max_filesize = env::var("MAX_FILESIZE").unwrap().parse::<u64>().unwrap();
-    // }
-
+fn directory_cleanup() -> Result<()> {
     for dir in std::fs::read_dir(TMP_DIR)? {
         let dir = dir?;
-        let dir_path = dir.path();
         let metadata = dir.metadata()?;
-        let now = SystemTime::now();
         if let Ok(time) = metadata.created() {
+            let now = SystemTime::now();
             let diff = now.duration_since(time).unwrap();
             if diff.as_secs() > 600 {
+                let dir_path = dir.path();
                 debug!("Deleting directory {:?}", dir_path);
-                match std::fs::remove_dir_all(dir_path.clone()) {
+                match std::fs::remove_dir_all(&dir_path) {
                     Ok(_) => {
                         debug!("Removed directory {:?}", dir_path);
                     }
@@ -54,22 +43,39 @@ async fn xxd(mut payload: Multipart) -> Result<NamedFile> {
             warn!("Not supported on this platform or filesystem");
         }
     }
+    Ok(())
+}
+
+async fn index(_req: HttpRequest) -> Result<NamedFile> {
+    let path: PathBuf = "./static/index.html".parse()?;
+    Ok(NamedFile::open(path)?)
+}
+
+async fn xxd(mut payload: Multipart) -> Result<NamedFile> {
+    // Maximum filesize in bytes
+    // let mut max_filesize = 20971520;
+    // if !env::var("MAX_FILESIZE").is_err() {
+    //     max_filesize = env::var("MAX_FILESIZE").unwrap().parse::<u64>().unwrap();
+    // }
+
+    // Remove old temporary files
+    directory_cleanup()?;
 
     // Create unique session id and directory
     let session_id = Uuid::new_v4();
     let session_dir = format!("{}/{}", TMP_DIR, session_id);
-    std::fs::create_dir(session_dir.clone())?;
+    std::fs::create_dir(&session_dir)?;
 
     // Load the first file
     let mut field = payload.try_next().await.unwrap().unwrap();
     let content_type = field.content_disposition().unwrap();
     let filename = content_type.get_filename().unwrap();
     let filepath = format!("{}/{}", session_dir, sanitize_filename::sanitize(filename));
-    let final_filename = format!("{}.cc", filename.clone());
-    let final_filepath = format!("{}.cc", filepath.clone());
+    let final_filename = format!("{}.cc", &filename);
+    let final_filepath = format!("{}.cc", &filepath);
 
     // Create file
-    let mut f = File::create(filepath.clone())?;
+    let mut f = File::create(&filepath)?;
 
     // Write bytes to file
     while let Some(chunk) = field.next().await {
@@ -82,7 +88,7 @@ async fn xxd(mut payload: Multipart) -> Result<NamedFile> {
         .current_dir(session_dir)
         .arg("-i")
         .arg(filename)
-        .arg(final_filename.clone())
+        .arg(&final_filename)
         .status()
         .expect("Failed");
     info!("Conversion exited with: {}", status);
