@@ -1,4 +1,4 @@
-//use std::env;
+use std::env;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
@@ -52,12 +52,6 @@ async fn index(_req: HttpRequest) -> Result<NamedFile> {
 }
 
 async fn xxd(mut payload: Multipart) -> Result<NamedFile> {
-    // Maximum filesize in bytes
-    // let mut max_filesize = 20971520;
-    // if !env::var("MAX_FILESIZE").is_err() {
-    //     max_filesize = env::var("MAX_FILESIZE").unwrap().parse::<u64>().unwrap();
-    // }
-
     // Remove old temporary files
     directory_cleanup()?;
 
@@ -112,7 +106,7 @@ async fn main() -> std::io::Result<()> {
     std::fs::create_dir_all(TMP_DIR)?;
 
     // Setup logging
-    std::env::set_var("RUST_LOG", "debug");
+    env::set_var("RUST_LOG", "debug");
     env_logger::init();
 
     // Setup http server

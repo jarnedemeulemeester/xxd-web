@@ -4,7 +4,11 @@ html {
 
 body {
   margin: 0;
-  background: linear-gradient(90deg, rgba(0,0,0,1) 0%, rgba(79,25,12,1) 100%);
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 1) 0%,
+    rgba(79, 25, 12, 1) 100%
+  );
   color: white;
   height: 100%;
   font-family: sans-serif;
@@ -36,10 +40,4 @@ p {
 
 .form {
   margin-bottom: 6px;
-}
-
-.max-file-size {
-  font-size: 12px;
-  color: #bbb;
-  text-align: left;
 }
