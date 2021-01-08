@@ -1,15 +1,10 @@
-extern crate actix_web;
-extern crate env_logger;
-extern crate log;
-extern crate uuid;
-
 //use std::env;
-use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
+use std::{fs::File, time::SystemTime};
 
-use log::info;
+use log::{debug, info, warn};
 
 use actix_files as fs;
 use actix_multipart::Multipart;
@@ -23,6 +18,8 @@ use header::ContentDisposition;
 
 use uuid::Uuid;
 
+static TMP_DIR: &str = "./tmp";
+
 async fn index(_req: HttpRequest) -> Result<NamedFile> {
     let path: PathBuf = "./static/index.html".parse()?;
     Ok(NamedFile::open(path)?)
@@ -35,9 +32,32 @@ async fn xxd(mut payload: Multipart) -> Result<NamedFile> {
     //     max_filesize = env::var("MAX_FILESIZE").unwrap().parse::<u64>().unwrap();
     // }
 
+    for dir in std::fs::read_dir(TMP_DIR)? {
+        let dir = dir?;
+        let dir_path = dir.path();
+        let metadata = dir.metadata()?;
+        let now = SystemTime::now();
+        if let Ok(time) = metadata.created() {
+            let diff = now.duration_since(time).unwrap();
+            if diff.as_secs() > 600 {
+                debug!("Deleting directory {:?}", dir_path);
+                match std::fs::remove_dir_all(dir_path.clone()) {
+                    Ok(_) => {
+                        debug!("Removed directory {:?}", dir_path);
+                    }
+                    Err(_) => {
+                        warn!("Cannot remove directory {:?}", dir_path);
+                    }
+                }
+            }
+        } else {
+            warn!("Not supported on this platform or filesystem");
+        }
+    }
+
     // Create unique session id and directory
     let session_id = Uuid::new_v4();
-    let session_dir = format!("./tmp/{}", session_id);
+    let session_dir = format!("{}/{}", TMP_DIR, session_id);
     std::fs::create_dir(session_dir.clone())?;
 
     // Load the first file
@@ -83,10 +103,10 @@ async fn xxd(mut payload: Multipart) -> Result<NamedFile> {
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     // Create temporary directory for file conversions
-    std::fs::create_dir_all("./tmp")?;
+    std::fs::create_dir_all(TMP_DIR)?;
 
     // Setup logging
-    std::env::set_var("RUST_LOG", "info");
+    std::env::set_var("RUST_LOG", "debug");
     env_logger::init();
 
     // Setup http server
